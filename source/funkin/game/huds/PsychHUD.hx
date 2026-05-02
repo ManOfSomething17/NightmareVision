@@ -15,6 +15,7 @@ class PsychHUD extends BaseHUD
 {
 	var ratingGraphic:FlxSprite;
 	var ratingNumGroup:FlxTypedGroup<FlxSprite>;
+	var timingTxt:FlxText;
 	
 	var healthBar:Bar;
 	var iconP1:HealthIcon;
@@ -29,6 +30,14 @@ class PsychHUD extends BaseHUD
 		"FC" => 0xfff16439,
 		"SDCB" => 0xffff5959,
 		"Clear" => 0xFFabfff4,
+	];
+
+	var timingColors:Map<String, FlxColor> = [
+		"epic" => 0xFF54ff7c,
+		"sick" => 0xffffee56,
+		"good" => 0xffffc156,
+		"bad" => 0xfff16439,
+		"shit" => 0xffff5959,
 	];
 	
 	var timeTxt:FlxText;
@@ -45,6 +54,7 @@ class PsychHUD extends BaseHUD
 	var showRating:Bool = ClientPrefs.showRatings;
 	var showRatingNum:Bool = ClientPrefs.showRatings;
 	var showCombo:Bool = ClientPrefs.showRatings;
+	var showTiming:Bool = ClientPrefs.showRatings;
 	var updateIconPos:Bool = true;
 	var updateIconScale:Bool = true;
 	var comboOffsets:Null<Array<Int>> = null; // So u can overwrite the users combo offset if needed without messing with clientprefs
@@ -114,6 +124,12 @@ class PsychHUD extends BaseHUD
 		
 		ratingNumGroup = new FlxTypedGroup();
 		add(ratingNumGroup);
+
+		timingTxt = new FlxText(0, 0, 140, 'hit a note BITCH');
+		timingTxt.setFormat(Paths.font("vcr.ttf"), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, 0xFF000000);
+		timingTxt.borderSize = 1.25;
+		timingTxt.alpha = 0;
+		add(timingTxt);
 		
 		onUpdateScore(0, 0, 0);
 		
@@ -306,8 +322,6 @@ class PsychHUD extends BaseHUD
 	{
 		final ratingImage = daRating.image;
 		
-		final posX = FlxG.width * 0.35;
-		
 		if (ClientPrefs.hideHud) return;
 		
 		parent.scripts.call('onPopUpScore', [note, daRating, ratingGraphic, ratingNumGroup]);
@@ -317,9 +331,9 @@ class PsychHUD extends BaseHUD
 			FlxTween.cancelTweensOf(ratingGraphic, ['scale.x', 'scale.y', 'alpha']);
 			ratingGraphic.alpha = 1;
 			ratingGraphic.loadGraphic(Paths.image(ratingPrefix + ratingImage + ratingSuffix));
+			ratingGraphic.scale.set(0.7, 0.7);
+			ratingGraphic.updateHitbox();
 			ratingGraphic.screenCenter();
-			ratingGraphic.x = posX - 40;
-			ratingGraphic.y -= 60;
 			ratingGraphic.x += comboOffsets[0];
 			ratingGraphic.y -= comboOffsets[1];
 			
@@ -328,7 +342,6 @@ class PsychHUD extends BaseHUD
 				ratingGraphic.scale.set(0.785, 0.785);
 				FlxTween.tween(ratingGraphic.scale, {x: 0.7, y: 0.7}, 0.5, {ease: FlxEase.expoOut});
 			}
-			ratingGraphic.updateHitbox();
 			FlxTween.tween(ratingGraphic, {alpha: 0}, 0.5, {startDelay: Conductor.stepCrotchet * 0.01, ease: FlxEase.expoOut});
 		}
 		
@@ -352,6 +365,8 @@ class PsychHUD extends BaseHUD
 			seperatedScore.push(Math.floor(combo / 10) % 10);
 			seperatedScore.push(combo % 10);
 			
+			var xOffset = seperatedScore.length - 1;
+			
 			var daLoop:Int = 0;
 			for (i in seperatedScore)
 			{
@@ -360,9 +375,10 @@ class PsychHUD extends BaseHUD
 				
 				numScore.loadGraphic(Paths.image(comboPrefix + 'num' + Std.int(i) + ratingSuffix));
 				numScore.alpha = 1;
+				numScore.scale.set(0.5, 0.5);
+				numScore.updateHitbox();
 				numScore.screenCenter();
-				numScore.x = posX + (43 * daLoop) - 90;
-				numScore.y += 80;
+				numScore.x += (43 * (daLoop - (xOffset / 2)));
 				numScore.x += comboOffsets[2];
 				numScore.y -= comboOffsets[3];
 				
@@ -378,6 +394,27 @@ class PsychHUD extends BaseHUD
 				
 				daLoop++;
 			}
+		}
+
+		if (showTiming)
+		{
+			FlxTween.cancelTweensOf(timingTxt, ['scale.x', 'scale.y', 'alpha']);
+			timingTxt.alpha = 1;
+			timingTxt.text = (Math.round((Conductor.songPosition - note.strumTime) * 100) * 0.01) + "ms";
+			timingTxt.color = timingColors.get(daRating.name) ?? FlxColor.WHITE;
+			timingTxt.scale.set(1, 1);
+			timingTxt.updateHitbox();
+			timingTxt.screenCenter();
+			timingTxt.x += comboOffsets[4];
+			timingTxt.y -= comboOffsets[5];
+			
+			if (comboTween)
+			{
+				timingTxt.scale.set(1.085, 1.085);
+				FlxTween.tween(timingTxt.scale, {x: 1, y: 1}, 0.5, {ease: FlxEase.expoOut});
+			}
+			timingTxt.updateHitbox();
+			FlxTween.tween(timingTxt, {alpha: 0}, 0.5, {startDelay: Conductor.stepCrotchet * 0.01, ease: FlxEase.expoOut});
 		}
 		
 		parent.scripts.call('onPopUpScorePost', [note, daRating, ratingGraphic, ratingNumGroup]);

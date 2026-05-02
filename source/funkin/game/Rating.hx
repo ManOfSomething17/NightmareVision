@@ -71,7 +71,7 @@ class Rating
 				score = 500;
 				noteSplash = true;
 			case 'sick':
-				ratingMod = 1;
+				ratingMod = ClientPrefs.useEpicRankings ? 0.95 : 1;
 				score = 350;
 				noteSplash = true;
 				
