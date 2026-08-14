@@ -47,6 +47,7 @@ class Rating
 	public var ratingMod:Float = 1;
 	public var score:Int = 350;
 	public var noteSplash:Bool = true;
+	public var health:Float = 0.023;
 	
 	public function new(name:String)
 	{
@@ -72,25 +73,31 @@ class Rating
 				ratingMod = 1;
 				score = 500;
 				noteSplash = true;
+				health = 0.03;
+
 			case 'sick':
 				ratingMod = ClientPrefs.useEpicRankings ? 0.95 : 1;
 				score = 350;
 				noteSplash = true;
+				health = 0.023;
 				
 			case 'good':
 				ratingMod = 0.7;
 				score = 200;
 				noteSplash = false;
+				health = 0.015;
 				
 			case 'bad':
 				ratingMod = 0.4;
 				score = 100;
 				noteSplash = false;
+				health = 0;
 				
 			case 'shit':
 				ratingMod = 0;
 				score = 50;
 				noteSplash = false;
+				health = -0.023;
 		}
 	}
 	

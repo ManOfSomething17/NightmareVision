@@ -385,10 +385,10 @@ class PsychHUD extends BaseHUD
 				if (comboTween)
 				{
 					numScore.scale.set(0.6, 0.6);
+					numScore.updateHitbox();
 					FlxTween.cancelTweensOf(numScore, ['scale.x', 'scale.y']);
 					FlxTween.tween(numScore.scale, {x: 0.5, y: 0.5}, 0.5, {ease: FlxEase.expoOut});
 				}
-				numScore.updateHitbox();
 				ratingNumGroup.add(numScore);
 				FlxTween.tween(numScore, {alpha: 0}, 0.5, {startDelay: Conductor.stepCrotchet * 0.01, ease: FlxEase.expoOut});
 				
