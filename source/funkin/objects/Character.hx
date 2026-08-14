@@ -38,6 +38,7 @@ class Character extends Bopper
 	
 	public var animTimer:Float = 0;
 	public var specialAnim:Bool = false;
+	public var holding(default, set):Bool = false;
 	public var stunned:Bool = false;
 	
 	/**
@@ -112,9 +113,11 @@ class Character extends Bopper
 	public var ghostAlpha:Float = 0.6;
 	
 	/**
-	 * Last hit row index
+	 * The hit time of the last note in milliseconds.
+	 * 
+	 * Only used for double note ghosts.
 	 */
-	public var mostRecentRow:Int = 0; // for ghost anims n shit
+	public var lastHitTime:Float = -1000;
 	
 	// Used on Character Editor
 	public var isPlayerInEditor:Null<Bool> = null;
@@ -181,6 +184,7 @@ class Character extends Bopper
 		
 		this.healthIcon = json.healthicon;
 		this.vSliceSustains = json.vslice_sustains;
+		this.ghostsEnabled = json.ghosts_enabled;
 		this.singDuration = json.sing_duration;
 		this.noAntialiasing = json.no_antialiasing;
 		
@@ -266,7 +270,7 @@ class Character extends Bopper
 			return;
 		}
 		
-		if (animTimer > 0 && !getAnimName().endsWith('-end'))
+		if (animTimer > 0 && !getAnimName().endsWith('-return'))
 		{
 			animTimer -= elapsed;
 			if (animTimer <= 0)
@@ -276,38 +280,26 @@ class Character extends Bopper
 			}
 		}
 		
-		if (specialAnim && isAnimFinished())
+		if (specialAnim && isAnimFinished() && !holding)
 		{
 			specialAnim = false;
 			dance(forceDance);
 		}
-		else if (getAnimName().endsWith('miss') && isAnimFinished())
+		else if (getAnimName().endsWith('miss') && isAnimFinished() && holdTimer >= Conductor.stepCrotchet * 0.002 * singDuration)
 		{
 			dance(forceDance);
 			finishAnim();
 		}
-		else if (getAnimName().endsWith('-end') && isAnimFinished())
+		else if (getAnimName().endsWith('-return') && isAnimFinished())
 		{
 			dance(forceDance);
 		}
 		
-		if (getAnimName().startsWith('sing'))
-		{
-			holdTimer += elapsed;
-		}
-		else if (isPlayer) holdTimer = 0;
+		if (getAnimName().startsWith('sing') || holding) holdTimer += elapsed;
 		
-		if (holdTimer >= Conductor.stepCrotchet * 0.0011 * singDuration)
+		if (!holding && holdTimer >= Conductor.stepCrotchet * 0.001 * singDuration)
 		{
-			if (hasAnim(getAnimName() + '-end'))
-			{
-				playAnim(getAnimName() + '-end', true);
-			}
-			else
-			{
-				dance(forceDance);
-			}
-			
+			dance(forceDance);
 			holdTimer = 0;
 		}
 		
@@ -318,7 +310,6 @@ class Character extends Bopper
 			for (ghost in doubleGhosts)
 				ghost.update(elapsed);
 		}
-		
 		super.update(elapsed);
 	}
 	
@@ -334,13 +325,33 @@ class Character extends Bopper
 		super.draw();
 	}
 	
+	function set_holding(isIt:Bool):Bool
+	{
+		if (!isIt && holding && holdTimer >= Conductor.stepCrotchet * 0.001 * singDuration)
+		{
+			dance(forceDance);
+			holdTimer = 0;
+		}
+		
+		return holding = isIt;
+	}
+	
 	/**
-	 * Plays the characters idle animation
+	 * Plays the characters idle animation.
+	 * First checks if a transition to idle (-return) animation exists,
+	 * then plays the idle animation.
 	 */
 	override function dance(forced:Bool = false)
 	{
 		if (debugMode || specialAnim) return;
-		super.dance(forced);
+		if (hasAnim(getAnimName() + '-return'))
+		{
+			playAnim(getAnimName() + '-return', true);
+		}
+		else
+		{
+			super.dance(forced);
+		}
 	}
 	
 	override function playAnim(animToPlay:String, isForced:Bool = false, isReversed:Bool = false, frame:Int = 0)
@@ -353,7 +364,7 @@ class Character extends Bopper
 	
 	override function onBeatHit(beat:Int)
 	{
-		if (stunned || getAnimName().startsWith('sing')) return;
+		if (stunned || getAnimName().startsWith('sing') || holding) return;
 		super.onBeatHit(beat);
 	}
 	

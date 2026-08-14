@@ -10,6 +10,19 @@ import flixel.util.FlxSave;
 import funkin.input.Controls.KeyboardScheme;
 import funkin.input.Controls;
 
+enum abstract UnderlayType(String) to String from String
+{
+	public var FIELD = 'Lane Underlay';
+	public var SCREEN = 'Screen Dim';
+	
+	// @:to
+	public static function toArray():Array<String> // dont want to jump to options states to update
+	{
+		// granted its a bit overkill to even do this for 2 options but i dunno remove it if u dont want it //or maybe i will another time
+		return [FIELD, SCREEN];
+	}
+}
+
 /**
  * to add new save options, make a static var with the `@saveVar` meta and itll be handled on its own
  * 
@@ -22,6 +35,8 @@ class ClientPrefs
 {
 	// debug ------------------------------------------------------------------------//
 	@saveVar public static var inDevMode:Bool = false;
+	
+	@saveVar public static var discordEnabled:Bool = true;
 	
 	@saveVar public static var fpsDisplayType:String = 'Simple';
 	
@@ -42,10 +57,10 @@ class ClientPrefs
 	
 	@saveVar public static var framerate:Int = 60;
 	
-	// visuals ------------------------------------------------------------------------//
-	@saveVar public static var jumpGhosts:Bool = false;
+	@saveVar public static var vsyncMode:VsyncMode = OFF;
 	
-	@saveVar public static var noteSplashes:Bool = true;
+	// visuals ------------------------------------------------------------------------//
+	@saveVar public static var noteSplashType:String = 'Both';
 	
 	@saveVar public static var hideHud:Bool = false;
 	
@@ -60,8 +75,6 @@ class ClientPrefs
 	@saveVar public static var scoreZoom:Bool = true;
 	
 	@saveVar public static var healthBarAlpha:Float = 1;
-	
-	@saveVar public static var pauseMusic:String = 'Tea Time';
 	
 	@saveVar public static var camFollowsCharacters:Bool = true;
 	
@@ -187,7 +200,7 @@ class ClientPrefs
 		'note_down' => [S, DOWN],
 		'note_up' => [W, UP],
 		'note_right' => [D, RIGHT],
-		'dodge' => [SPACE, NONE],
+		'note_dodge' => [SPACE, NONE],
 		'ui_left' => [A, LEFT],
 		'ui_down' => [S, DOWN],
 		'ui_up' => [W, UP],
@@ -196,11 +209,15 @@ class ClientPrefs
 		'back' => [BACKSPACE, ESCAPE],
 		'pause' => [ENTER, ESCAPE],
 		'reset' => [R, NONE],
+		'fullscreen' => [F11, NONE],
 		'volume_mute' => [ZERO, NONE],
 		'volume_up' => [NUMPADPLUS, PLUS],
 		'volume_down' => [NUMPADMINUS, MINUS],
 		'debug_1' => [SEVEN, NONE],
-		'debug_2' => [EIGHT, NONE]
+		'debug_2' => [EIGHT, NONE],
+		'soft_reload' => [F5, NONE],
+		'hard_reload' => [F6, NONE],
+		'switch_debug_display' => [F3, NONE]
 	];
 	
 	public static var defaultKeys:Map<Action, Array<FlxKey>> = null;
@@ -210,9 +227,33 @@ class ClientPrefs
 		'note_down' => [DPAD_DOWN, A],
 		'note_left' => [DPAD_LEFT, X],
 		'note_right' => [DPAD_RIGHT, B],
+		'note_dodge' => [GUIDE]
 	];
 	
+	// using a separate map for custom binds to ensure the engine doesnt get confused on what binds are real and temporary
+	@saveVar(false, false) public static var customKeys:Map<Action, Array<FlxKey>> = [];
+	@saveVar(false, false) public static var customPad:Map<Action, Array<FlxGamepadInputID>> = [];
+	
 	public static var defaultGamepadBinds:Map<Action, Array<FlxGamepadInputID>> = null;
+	
+	public static function addCustomKey(name:String, keys:Array<FlxKey>)
+	{
+		if (name.length >= 1 && keys != null)
+		{
+			var tempKeys = keys;
+			while (tempKeys.length < 2)
+				tempKeys.push(NONE);
+				
+			customKeys.set(name, tempKeys);
+		}
+		
+		for (key in customKeys.keys())
+		{
+			final binds = customKeys.get(key);
+			
+			if (binds != null && binds.length >= 2 && !keyBinds.exists(key)) keyBinds.set(key, binds);
+		}
+	}
 	
 	public static function loadDefaultKeys()
 	{
@@ -306,6 +347,8 @@ class ClientPrefs
 		
 		changeFps(framerate);
 		
+		refreshVSyncMode();
+		
 		var save:FlxSave = new FlxSave();
 		save.bind('controls_v2');
 		if (save != null && save.data.customControls != null) CoolUtil.copyMapValues(save.data.customControls, keyBinds);
@@ -315,6 +358,11 @@ class ClientPrefs
 		save = FlxDestroyUtil.destroy(save);
 	}
 	
+	/**
+	 * Helper function to change the games framerate.
+	 * 
+	 * If `ClientPrefs.unlockedFramerate`, this will do nothing but uncap the framerate (if it hasnt been already).
+	 */
 	public static function changeFps(fps:Int = 60)
 	{
 		fps = unlockedFramerate ? 0 : Std.int(FlxMath.bound(fps, 60, 400));
@@ -329,6 +377,14 @@ class ClientPrefs
 			FlxG.drawFramerate = fps;
 			FlxG.updateFramerate = fps;
 		}
+	}
+	
+	/**
+	 * Updates the windows Vsync mode to match `vsyncMode`
+	 */
+	public static function refreshVSyncMode()
+	{
+		FlxG.stage.window.setVSyncMode(ClientPrefs.vsyncMode);
 	}
 	
 	inline public static function getGameplaySetting(name:String, defaultValue:Dynamic):Dynamic

@@ -2,11 +2,11 @@ package funkin.objects.note;
 
 import funkin.data.*;
 import funkin.objects.Bopper;
-import funkin.game.shaders.RGBPalette.RGBShaderReference;
+import funkin.game.shaders.RGBShader;
 
 class SustainSplash extends FunkinSprite implements funkin.game.modchart.IModNote
 {
-	public var rgbShader:RGBShaderReference;
+	public var rgbGraphics:RGBGraphics = new RGBGraphics();
 	
 	public var data(get, set):Int;
 	public var noteData:Int = 0;
@@ -15,6 +15,8 @@ class SustainSplash extends FunkinSprite implements funkin.game.modchart.IModNot
 	
 	private var _note:Note;
 	private var _strum:StrumNote;
+	
+	public var completed:Bool = false; // uhh coudl probably siwtch this up to use tail state
 	
 	// internal thing to optimize loading frames
 	@:noCompletion var _textureLoaded:Null<String> = null;
@@ -25,14 +27,12 @@ class SustainSplash extends FunkinSprite implements funkin.game.modchart.IModNot
 	{
 		super(x, y);
 		
-		rgbShader = NoteUtil.initRGBShader(this, noteData, 0, player);
-		
 		addAnims(NoteUtil.getSkinFromID(player));
 	}
 	
 	function addAnims(_skin:NoteSkin)
 	{
-		frames = Paths.getSparrowAtlas(_skin.sustainSplashTexture);
+		frames = Paths.getAtlasFrames(_skin.sustainSplashTexture);
 		
 		final animData = _skin.susSplashAnims;
 		
@@ -69,11 +69,11 @@ class SustainSplash extends FunkinSprite implements funkin.game.modchart.IModNot
 		
 		final sanitzedColourArray = colors ?? NoteUtil.colorToArray(skin.colors[data]);
 		
-		rgbShader.enabled = skin.inEngineColoring;
-		rgbShader.setColors(sanitzedColourArray);
+		rgbGraphics.enabled = skin.inEngineColoring;
+		rgbGraphics.setColors(sanitzedColourArray);
 	}
 	
-	public function setupSplash(strum:StrumNote, ?note:Note, ?time:Float = 0.5, ?isPlayer:Bool = false, ?colourInput:Array<FlxColor>, ?field:PlayField)
+	public function setupSplash(strum:StrumNote, ?note:Note, ?time:Float = 0.5, ?isPlayer:Bool = false, ?graphicsInput:RGBGraphics, ?field:PlayField)
 	{
 		this._note = note;
 		this._strum = strum;
@@ -94,32 +94,82 @@ class SustainSplash extends FunkinSprite implements funkin.game.modchart.IModNot
 		
 		baseScale.copyFrom(scale);
 		
+		addAnims(skin);
+		
 		updateHitbox();
 		
 		playAnim('start$data', true);
-		setColors(colourInput);
-		_position();
+		setColors(graphicsInput?.getColors());
 		
-		FlxTimer.wait(time, () -> {
-			if (isPlayer && ClientPrefs.noteSplashes) playAnim('end$data', true);
-			else kill();
-		});
+		updatePosition();
+		
+		findTail(note);
+		__isPlayer = isPlayer;
 	}
 	
-	function _position()
+	var __tail:Note;
+	var __isPlayer:Bool = false;
+	
+	function findTail(note:Null<Note>)
 	{
-		if (_strum != null)
+		__tail = note;
+		if (__tail != null && __tail.tail.length > 0)
 		{
-			final _skin:NoteSkin = NoteUtil.getSkinFromID(player);
-			
-			final offsets = _skin.sustainSplashOffsets != null ? _skin.sustainSplashOffsets[data] : null;
-			
-			setPosition(_strum.x + (_strum.width - width) * .5, _strum.y + (_strum.height - height) * .5);
-			spriteOffset.set(offsets?.x, offsets?.y);
+			__tail = __tail.tail[__tail.tail.length - 1];
 		}
+	}
+	
+	function watchTail()
+	{
+		if (__tail == null || (__tail != null && __tail.garbage))
+		{
+			kill(); // die dont even splash jsut die
+			return;
+		}
+		
+		if (__tail.wasGoodHit) completed = true;
+		
+		if (!__tail.alive && !getAnimName().startsWith('end'))
+		{
+			completed = true;
+			
+			if (__isPlayer && (ClientPrefs.noteSplashType == "Both" || ClientPrefs.noteSplashType == "Hold Covers")) playAnim('end$data', true);
+			else kill();
+		}
+	}
+	
+	function updatePosition()
+	{
+		if (_strum == null) return;
+		
+		final _skin:NoteSkin = NoteUtil.getSkinFromID(player);
+		
+		final offsets = _skin.sustainSplashOffsets != null ? _skin.sustainSplashOffsets[data] : null;
+		
+		setPosition(_strum.x + (_strum.width - width) * .5, _strum.y + (_strum.height - height) * .5);
+		spriteOffset.set(offsets?.x, offsets?.y);
 	}
 	
 	inline function get_data():Int return noteData;
 	
 	inline function set_data(v:Int):Int return noteData = v;
+	
+	override function update(elapsed:Float)
+	{
+		super.update(elapsed);
+		
+		watchTail();
+	}
+	
+	override function drawSimple(camera:FlxCamera)
+	{
+		super.drawSimple(camera);
+		rgbGraphics.pushQuad(camera);
+	}
+	
+	override function drawComplex(camera:FlxCamera)
+	{
+		super.drawComplex(camera);
+		rgbGraphics.pushQuad(camera);
+	}
 }
